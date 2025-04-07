@@ -1,0 +1,84 @@
+@using TicTacToeBlazor.Models
+
+@if (Board != null && Board.GetLength(0) > 0)
+{
+    <div class="game-board" style="@($"--board-size: {BoardSize};")">
+        @for (int i = 0; i < BoardSize; i++)
+        {
+            @for (int j = 0; j < BoardSize; j++)
+            {
+                var row = i; // Capture loop variables for lambda
+                var col = j;
+                var cellValue = Board[row, col];
+                <button class="cell @GetCellClass(cellValue)"
+                        disabled="@IsDisabled"
+                        @onclick="() => OnCellClick.InvokeAsync((row, col))">
+                    @cellValue
+                </button>
+            }
+        }
+    </div>
+}
+else
+{
+    <p>Board not initialized.</p>
+}
+
+<style>
+    .game-board {
+        display: grid;
+        grid-template-columns: repeat(var(--board-size, 3), 50px); /* Use CSS variable */
+        grid-template-rows: repeat(var(--board-size, 3), 50px); /* Use CSS variable */
+        gap: 5px;
+        margin: 20px auto; /* Center the board */
+        width: fit-content; /* Adjust width to content */
+    }
+
+    .cell {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+        font-weight: bold;
+        border: 1px solid #ccc;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        background-color: #f9f9f9;
+        transition: background-color 0.2s;
+    }
+
+    .cell:hover:not(:disabled) {
+        background-color: #e0e0e0;
+    }
+
+    .cell:disabled {
+        cursor: not-allowed;
+        background-color: #eee; /* Keep background light even when disabled */
+        color: #555; /* Ensure symbol is visible */
+    }
+
+     .cell.X {
+         color: blue;
+     }
+     .cell.O {
+         color: red;
+     }
+</style>
+
+@code {
+    [Parameter] public string?[,] Board { get; set; } = default!;
+    [Parameter] public int BoardSize { get; set; }
+    [Parameter] public bool IsDisabled { get; set; } // Disable board when not player's turn or game over
+    [Parameter] public EventCallback<(int row, int col)> OnCellClick { get; set; }
+
+    private string GetCellClass(string? cellValue)
+    {
+        return cellValue switch
+        {
+            "X" => "X",
+            "O" => "O",
+            _ => ""
+        };
+    }
+}

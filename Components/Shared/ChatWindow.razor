@@ -1,0 +1,117 @@
+@using TicTacToeBlazor.Models
+
+<div class="chat-window">
+    <div class="chat-messages" id="chatMessagesDiv">
+        @if (Messages != null)
+        {
+            @foreach (var msg in Messages)
+            {
+                <div class="chat-message">
+                    <strong>@msg.PlayerName:</strong> @msg.Message <span class="chat-timestamp">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                </div>
+            }
+        }
+    </div>
+    <div class="chat-input">
+        <input @bind="newMessage"
+               placeholder="Type message..."
+               @onkeyup="HandleInputKeyUp"
+               disabled="@IsDisabled" />
+        <button @onclick="SendMessage" disabled="@IsDisabled || string.IsNullOrWhiteSpace(newMessage)">Send</button>
+    </div>
+</div>
+
+<style>
+    .chat-window {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        height: 300px; /* Adjust as needed */
+         background-color: white;
+    }
+
+    .chat-messages {
+        flex-grow: 1;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+    }
+    .chat-message {
+         margin-bottom: 5px;
+         word-wrap: break-word;
+    }
+    .chat-timestamp {
+         font-size: 0.8em;
+         color: #888;
+         margin-left: 10px;
+    }
+
+    .chat-input {
+        display: flex;
+    }
+
+    .chat-input input {
+        flex-grow: 1;
+        margin-right: 5px;
+        padding: 5px;
+    }
+     .chat-input button:disabled {
+         opacity: 0.6;
+     }
+</style>
+
+@code {
+    [Parameter] public List<ChatMessage>? Messages { get; set; }
+    [Parameter] public EventCallback<string> OnSendMessage { get; set; }
+    [Parameter] public bool IsDisabled { get; set; } // Disable chat input when game not active/found
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+
+    private string newMessage = string.Empty;
+
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(newMessage) && !IsDisabled)
+        {
+            await OnSendMessage.InvokeAsync(newMessage);
+            newMessage = string.Empty; // Clear input after sending
+             await ScrollToBottom();
+        }
+    }
+
+    private async Task HandleInputKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+     // Call this after new messages are added or initially
+     public async Task ScrollToBottom()
+     {
+         try {
+              // Delay slightly to allow the DOM to update after StateHasChanged
+             await Task.Delay(50);
+             await JSRuntime.InvokeVoidAsync("scrollToBottom", "chatMessagesDiv");
+         } catch(Exception ex) {
+             Console.WriteLine($"Error scrolling chat: {ex.Message}");
+         }
+
+     }
+
+     // Add corresponding JS function to your _Host.cshtml or App.razor or a separate JS file
+     // In wwwroot/app.js (create if needed) and reference in App.razor/_Host.cshtml:
+     /*
+     function scrollToBottom(elementId) {
+         var element = document.getElementById(elementId);
+         if (element) {
+             element.scrollTop = element.scrollHeight;
+         }
+     }
+     */
+     // Add <script src="app.js"></script> to App.razor (before blazor.web.js) or _Host.cshtml (before closing body tag)
+}

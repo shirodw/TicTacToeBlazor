@@ -1,0 +1,182 @@
+﻿@page "/stats"
+@rendermode InteractiveServer
+@inject IDbContextFactory<TicTacToeBlazor.Data.ApplicationDbContext> DbFactory
+@using Microsoft.EntityFrameworkCore
+@using TicTacToeBlazor.Models
+
+<PageTitle>Statistics</PageTitle>
+
+<h1>Game Statistics</h1>
+
+@if (isLoading)
+{
+    <p><em>Loading statistics...</em></p>
+}
+else
+{
+    <h2>Players</h2>
+    @if (players == null || !players.Any())
+    {
+        <p>No players found.</p>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Games Played</th>
+                    <th>Games Won</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var player in players.OrderBy(p => p.Name))
+                {
+                    <tr>
+                        <td>@player.Id</td>
+                        <td>@player.Name</td>
+                        <td>@(player.GamesAsPlayer1.Count + player.GamesAsPlayer2.Count)</td>
+                        <td>@player.WonGames.Count</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <hr />
+
+    <h2>Game History</h2>
+    @if (games == null || !games.Any())
+    {
+        <p>No game history found.</p>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Game ID</th>
+                    <th>Player 1 (X)</th> @* Clarify symbol in header *@
+                    <th>Player 2 (O)</th> @* Clarify symbol in header *@
+                    <th>Winner</th>
+                    <th>Board Size</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Turns</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var game in games.OrderByDescending(g => g.StartDate))
+                {
+                    <tr>
+                        <td>@game.Id</td>
+                        <td>@game.Player1?.Name (@game.Player1Id)</td>
+                        <td>@game.Player2?.Name (@game.Player2Id)</td>
+                        <td>@(game.Winner?.Name ?? (game.EndDate.HasValue ? "Draw" : "In Progress")) (@(game.WinnerId?.ToString() ?? "-"))</td>
+                        <td>@game.BoardSize x @game.BoardSize</td>
+                        <td>@game.StartDate.ToLocalTime()</td>
+                        <td>@game.EndDate?.ToLocalTime()</td>
+                        <td>@game.Turns.Count</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <hr />
+
+    <h2>All Turns (Recent 100)</h2>
+    @if (turns == null || !turns.Any())
+    {
+        <p>No turns recorded.</p>
+    }
+    else
+    {
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Turn ID</th>
+                    <th>Game ID</th>
+                    <th>Player</th>
+                    <th>Symbol</th> @* <-- ADDED HEADER *@
+                    <th>Coords (Row, Col)</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var turn in turns)
+                {
+                    // Find the game associated with this turn to determine the symbol
+                    var gameForTurn = games?.FirstOrDefault(g => g.Id == turn.GameId);
+                    string symbol = "?"; // Default if game not found or player mismatch
+                    if (gameForTurn != null)
+                    {
+                        if (turn.PlayerId == gameForTurn.Player1Id) symbol = "X";
+                        else if (turn.PlayerId == gameForTurn.Player2Id) symbol = "O";
+                    }
+
+                    <tr>
+                        <td>@turn.Id</td>
+                        <td>@turn.GameId</td>
+                        <td>@turn.Player?.Name (@turn.PlayerId)</td>
+                        <td>@symbol</td> @* <-- ADDED CELL *@
+                        <td>(@turn.CoordX, @turn.CoordY)</td>
+                        <td>@turn.Timestamp.ToLocalTime()</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+
+@code {
+    private bool isLoading = true;
+    private List<Player>? players;
+    private List<Game>? games; // Ensure games list is loaded before turns loop
+    private List<Turn>? turns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+        isLoading = false;
+    }
+
+    private async Task LoadStats()
+    {
+        using var context = DbFactory.CreateDbContext();
+        try
+        {
+            // Load games first, including players, winner, turns count
+            games = await context.Games
+                .Include(g => g.Player1)
+                .Include(g => g.Player2)
+                .Include(g => g.Winner)
+                .Include(g => g.Turns)
+                .ToListAsync(); // Load games into memory
+
+            // Then load players
+            players = await context.Players
+                .Include(p => p.GamesAsPlayer1)
+                .Include(p => p.GamesAsPlayer2)
+                .Include(p => p.WonGames)
+                .ToListAsync();
+
+            // Then load turns, including player info
+            turns = await context.Turns
+                .Include(t => t.Player)
+                .OrderByDescending(t => t.Timestamp)
+                .Take(100) // Limit for performance
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading statistics: {ex.Message}");
+            // Handle error display if necessary
+            games = new List<Game>(); // Prevent null reference errors in loop
+            players = new List<Player>();
+            turns = new List<Turn>();
+        }
+    }
+}
