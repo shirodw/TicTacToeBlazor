@@ -13,12 +13,16 @@
         }
     </div>
     <div class="chat-input">
-        <input @bind="newMessage"
-               placeholder="Type message..."
-               @onkeyup="HandleInputKeyUp"
-               disabled="@IsDisabled" />
-        <button @onclick="SendMessage" disabled="@IsDisabled || string.IsNullOrWhiteSpace(newMessage)">Send</button>
-    </div>
+    <input @bind="newMessage"
+           @bind:event="oninput" @* Ensure binding updates on every keystroke for responsiveness *@
+           placeholder="Type message..."
+           @onkeyup="HandleInputKeyUp"
+           disabled="@IsDisabled" /> @* Input disabled based on parent state *@
+    <button @onclick="SendMessage"
+            disabled="@(IsDisabled || string.IsNullOrWhiteSpace(newMessage))"> @* Button disabled if parent says so OR message is empty *@
+        Send
+    </button>
+</div>
 </div>
 
 <style>
